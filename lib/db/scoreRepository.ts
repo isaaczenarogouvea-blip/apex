@@ -78,63 +78,43 @@ export async function getScoreForDate(
   return rowToRecord(created as DailyScoreRow);
 }
 
-/** Fields required to persist a freshly recomputed daily score. */
-export interface UpsertScoreInput {
-  pointsEarned: number;
-  pointsPossible: number;
-  scorePercent: number;
-  failureCount: number;
-  weightedFailureCount: number;
-  dayStatus: DayStatus | string;
-}
-
 /**
  * Inserts or updates the daily_scores row for `date` with a full recalculation.
- * Intentionally never touches `finalized` on conflict — that flag is only
- * ever flipped by `markScoreFinalized`, so recalculating mid-day (e.g. after
- * toggling a habit) can't accidentally un-finalize an already-closed day.
  */
 export async function upsertScore(
   db: SQLite.SQLiteDatabase,
   date: string,
-  input: UpsertScoreInput
+  pointsEarned: number,
+  pointsPossible: number,
+  scorePercent: number,
+  failureCount: number,
+  weightedFailureCount: number,
+  dayStatus: DayStatus | string,
+  finalized: boolean
 ): Promise<void> {
   await db.runAsync(
     `INSERT INTO daily_scores
        (date, points_earned, points_possible, score_percent, failure_count, weighted_failure_count, day_status, finalized)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(date) DO UPDATE SET
        points_earned = excluded.points_earned,
        points_possible = excluded.points_possible,
        score_percent = excluded.score_percent,
        failure_count = excluded.failure_count,
        weighted_failure_count = excluded.weighted_failure_count,
-       day_status = excluded.day_status;`,
+       day_status = excluded.day_status,
+       finalized = excluded.finalized;`,
     [
       date,
-      input.pointsEarned,
-      input.pointsPossible,
-      input.scorePercent,
-      input.failureCount,
-      input.weightedFailureCount,
-      input.dayStatus,
+      pointsEarned,
+      pointsPossible,
+      scorePercent,
+      failureCount,
+      weightedFailureCount,
+      dayStatus,
+      finalized ? 1 : 0,
     ]
   );
-}
-
-/**
- * Explicitly flips the `finalized` flag for a day's score, independent of
- * point recalculation. Called once, at end-of-day.
- */
-export async function markScoreFinalized(
-  db: SQLite.SQLiteDatabase,
-  date: string,
-  finalized: boolean
-): Promise<void> {
-  await db.runAsync(`UPDATE daily_scores SET finalized = ? WHERE date = ?;`, [
-    finalized ? 1 : 0,
-    date,
-  ]);
 }
 
 /**

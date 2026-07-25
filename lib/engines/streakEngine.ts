@@ -46,6 +46,16 @@ async function getOrCreateStreak(
 }
 
 /**
+ * Reads the current daily streak without mutating it. Use this for display
+ * purposes (e.g. on every screen focus); only `updateStreak` should ever
+ * advance or reset the count, and only once per finalized day.
+ */
+export async function getStreak(db: SQLite.SQLiteDatabase): Promise<StreakResult> {
+  const streak = await getOrCreateStreak(db, STREAK_TYPE);
+  return { currentStreak: streak.current_count, bestStreak: streak.best_count };
+}
+
+/**
  * Advances (or resets) the running daily streak based on the outcome of
  * `date`. 'elite'/'good' days extend the streak; 'average'/'bad' days break
  * it. best_count is a high-water mark that only ever grows.

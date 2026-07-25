@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { getDatabase } from '../db/database';
-import { checkShameCondition } from '../engines/streakEngine';
+import { checkShameCondition, getStreak } from '../engines/streakEngine';
 
 export function useStreak() {
   const todayDate = useAppStore((s) => s.todayDate);
@@ -13,17 +13,8 @@ export function useStreak() {
     try {
       const db = await getDatabase();
 
-      const row = await db.getFirstAsync<{
-        current_count: number;
-        best_count: number;
-      }>(`SELECT current_count, best_count FROM streaks WHERE type = 'daily' LIMIT 1;`);
-
-      if (row) {
-        setStreak({
-          currentStreak: row.current_count,
-          bestStreak: row.best_count,
-        });
-      }
+      const result = await getStreak(db);
+      setStreak(result);
 
       const shame = await checkShameCondition(db, todayDate);
       setIsShameCondition(shame);

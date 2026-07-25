@@ -45,21 +45,24 @@ export function useNutrition() {
         const db = await getDatabase();
         await toggleMealEaten(db, todayDate, mealId, eaten);
 
+        // Re-derive the goal from the same map we just optimistically
+        // updated, so the calorie_goal habit toggles in both directions
+        // (e.g. un-checking a meal can drop the day back below goal).
         const updatedLogs = { ...mealLogs, [mealId]: eaten };
         const totalCal = PRESET_MEALS.reduce(
           (sum, m) => sum + (updatedLogs[m.id] ? m.kcal : 0),
           0
         );
+        const allMealsEaten = PRESET_MEALS.every((m) => updatedLogs[m.id]);
+        const goalReached = allMealsEaten || totalCal >= DAILY_CALORIE_GOAL;
 
-        if (totalCal >= DAILY_CALORIE_GOAL) {
-          await toggleHabit(db, 'calorie_goal', todayDate, true);
-          const result = await calculateDailyScore(db, todayDate);
-          setScore({
-            pointsEarned: result.pointsEarned,
-            scorePercent: result.scorePercent,
-            dayStatus: result.dayStatus,
-          });
-        }
+        await toggleHabit(db, 'calorie_goal', todayDate, goalReached);
+        const result = await calculateDailyScore(db, todayDate);
+        setScore({
+          pointsEarned: result.pointsEarned,
+          scorePercent: result.scorePercent,
+          dayStatus: result.dayStatus,
+        });
       } catch (error) {
         console.error('Failed to toggle meal:', error);
         toggleMealLog(mealId, !eaten);
